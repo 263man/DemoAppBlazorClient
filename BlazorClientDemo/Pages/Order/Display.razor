@@ -1,0 +1,135 @@
+﻿@page "/Order/Display/{id:int}"
+@inject HttpClient Http
+@inject NavigationManager navigationManager
+
+<h3>Display</h3>
+@if (string.IsNullOrWhiteSpace(errorString) == false)
+{
+    <h4>System Error</h4>
+    <p>@errorString</p>
+}
+
+else if(orderInfo.Order is null)
+{
+    <h4>Loading...</h4>
+}
+else
+{
+    <table class="table">
+        <tbody>
+            <tr>
+                <td><strong>Order Name</strong></td>
+                <td>@orderInfo.Order.OrderName</td>
+            </tr>
+            <tr>
+                <td><strong>Order Date</strong></td>
+                <td>@orderInfo.Order.OrderDate</td>
+            </tr>
+            <tr>
+                <td><strong>Order Total</strong></td>
+                <td>@string.Format("{0:C}", orderInfo.Order.Total)</td>
+            </tr>
+            <tr>
+                <td><strong>Item Ordered</strong></td>
+                <td>@orderInfo.ItemPurchased</td>
+            </tr>
+            <tr>
+                <td><strong>Quantity Ordered</strong></td>
+                <td>@orderInfo.Order.Quantity</td>
+            </tr>
+            <tr>
+                <td colspan="2">
+                    @if (confirmDelete == true)
+                    {
+                        <button class="btn btn-outline-danger" @onclick = "HandleDeleteRecord">
+                            Confirm Delete
+                        </button>
+                        <button class="btn btn-secondary" @onclick="(() => confirmDelete = false)">
+                            Cancel
+                        </button>
+                    }
+                    else
+                    {
+                        <button class="btn btn-danger" @onclick="(() => confirmDelete = true)">
+                            Delete Order
+                        </button>
+                    }
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <EditForm Model="@updateModel" OnValidSubmit="HandleValidSubmit" FormName="OrderForm">
+        <DataAnnotationsValidator />
+        <ValidationSummary Model="@updateModel" />
+        <div class="form-group mb-3">
+            <label class="control-label">Order Name</label>
+            <InputText @bind-value="updateModel.OrderName" class="form-control" />
+            <ValidationMessage For="@(() => updateModel.OrderName)" class="text-danger" />
+        </div>
+        <div class="form-group">
+            <button type="submit" class="btn btn-primary">Update Order</button>
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+    private OrderResultsModel orderInfo = new OrderResultsModel()
+    {
+            Order = default!, //default! is a temporary workaround for required properties I may set later.
+            ItemPurchased = string.Empty
+    };
+    private string? errorString;
+    private OrderUpdateModel updateModel = new OrderUpdateModel();
+    private bool confirmDelete = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        HttpResponseMessage response = await Http.GetAsync($"api/order/{Id}");
+
+        if(response.IsSuccessStatusCode)
+        {
+            var result = await response.Content.ReadFromJsonAsync<OrderResultsModel>();
+            if (result is not null)
+            {
+                orderInfo = result;
+                updateModel.Id = orderInfo.Order.Id;
+                updateModel.OrderName = orderInfo.Order.OrderName;
+            }
+            else
+            {
+                errorString = "Failed to deserialize order information.";
+            }
+        }
+        else
+        {
+            errorString = response.ReasonPhrase;
+        }
+    }
+    private async Task HandleValidSubmit()
+    {
+        try
+        {
+            HttpResponseMessage response = await Http.PutAsJsonAsync("api/order", updateModel);
+            orderInfo.Order.OrderName = updateModel.OrderName;
+        }
+        catch (Exception ex)
+        {
+            errorString = ex.Message;
+        }
+    }
+    private async Task HandleDeleteRecord()
+    {
+        HttpResponseMessage response = await Http.DeleteAsync($"api/order/{Id}");
+        if (response.IsSuccessStatusCode)
+        {
+            navigationManager.NavigateTo("food/List");
+        }
+        else
+        {
+            errorString = response.ReasonPhrase;
+        }
+    }
+    }

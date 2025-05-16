@@ -1,0 +1,69 @@
+﻿@page "/food/list"
+@inject HttpClient Http
+
+<h3>List</h3>
+@if (string.IsNullOrWhiteSpace(errorString) == false)
+{
+    <h4>System Error</h4>
+    <p>@errorString</p>
+}
+else if (foodList.Count == 0)
+{
+    <h4>Loading...</h4>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Description</th>
+                <th>Price</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var food in foodList)
+            {
+                <tr>
+                    <td>@food.Title</td>
+                    <td>@food.Description</td>
+                    <td>@string.Format("{0:C}", food.Price)</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<FoodModel> foodList = new List<FoodModel>();
+    private string? errorString;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            errorString = null;
+            HttpResponseMessage httpResponse = await Http.GetAsync("api/food");
+            if (httpResponse.IsSuccessStatusCode)
+            {
+                foodList = await httpResponse.Content.ReadFromJsonAsync<List<FoodModel>>() ?? new List<FoodModel>();
+                if (!foodList.Any())
+                {
+                    Console.WriteLine("API returned success but no food items");
+                }
+            }
+            else
+            {
+                errorString = $"Error fetching food items: {httpResponse.StatusCode} - {httpResponse.ReasonPhrase}";
+                Console.WriteLine(errorString);
+            }
+        }
+        catch (Exception ex)
+        {
+            errorString = $"An exception occured while loading food items: {ex.Message}";
+            Console.WriteLine(errorString);
+            Console.WriteLine(ex.ToString());
+        }
+    }
+
+}
