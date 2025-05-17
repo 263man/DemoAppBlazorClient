@@ -2,134 +2,179 @@
 @inject HttpClient Http
 @inject NavigationManager navigationManager
 
-<h3>Display</h3>
-@if (string.IsNullOrWhiteSpace(errorString) == false)
-{
-    <h4>System Error</h4>
-    <p>@errorString</p>
-}
+<h3 class="mb-4">Order Details</h3>
 
-else if(orderInfo.Order is null)
+@if (!string.IsNullOrWhiteSpace(errorString))
 {
-    <h4>Loading...</h4>
+    <div class="alert alert-danger">
+        <h5 class="alert-heading">System Error</h5>
+        <p>@errorString</p>
+    </div>
+}
+else if (orderInfo.Order is null)
+{
+    <div class="text-center">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p>Loading order...</p>
+    </div>
 }
 else
 {
-    <table class="table">
-        <tbody>
-            <tr>
-                <td><strong>Order Name</strong></td>
-                <td>@orderInfo.Order.OrderName</td>
-            </tr>
-            <tr>
-                <td><strong>Order Date</strong></td>
-                <td>@orderInfo.Order.OrderDate</td>
-            </tr>
-            <tr>
-                <td><strong>Order Total</strong></td>
-                <td>@string.Format("{0:C}", orderInfo.Order.Total)</td>
-            </tr>
-            <tr>
-                <td><strong>Item Ordered</strong></td>
-                <td>@orderInfo.ItemPurchased</td>
-            </tr>
-            <tr>
-                <td><strong>Quantity Ordered</strong></td>
-                <td>@orderInfo.Order.Quantity</td>
-            </tr>
-            <tr>
-                <td colspan="2">
-                    @if (confirmDelete == true)
-                    {
-                        <button class="btn btn-outline-danger" @onclick = "HandleDeleteRecord">
-                            Confirm Delete
-                        </button>
-                        <button class="btn btn-secondary" @onclick="(() => confirmDelete = false)">
-                            Cancel
-                        </button>
-                    }
-                    else
-                    {
-                        <button class="btn btn-danger" @onclick="(() => confirmDelete = true)">
-                            Delete Order
-                        </button>
-                    }
-                </td>
-            </tr>
-        </tbody>
-    </table>
+    <div class="card mb-4">
+        <div class="card-header">
+            <strong>Order Summary</strong>
+        </div>
+        <div class="card-body">
+            <table class="table table-bordered">
+                <tbody>
+                    <tr>
+                        <th scope="row">Order Name</th>
+                        <td>@orderInfo.Order.OrderName</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Order Date</th>
+                        <td>@orderInfo.Order.OrderDate.ToShortDateString()</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Order Total</th>
+                        <td>@string.Format("{0:C}", orderInfo.Order.Total)</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Item Ordered</th>
+                        <td>@orderInfo.ItemPurchased</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Quantity Ordered</th>
+                        <td>@orderInfo.Order.Quantity</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="text-end">
+                @if (confirmDelete)
+                {
+                    <div class="d-flex gap-2 justify-content-end">
+                        <button class="btn btn-outline-danger" @onclick="HandleDeleteRecord">Confirm Delete</button>
+                        <button class="btn btn-secondary" @onclick="(() => confirmDelete = false)">Cancel</button>
+                    </div>
+                }
+                else
+                {
+                    <button class="btn btn-danger" @onclick="(() => confirmDelete = true)">
+                        <i class="bi bi-trash"></i> Delete Order
+                    </button>
+                }
+            </div>
+        </div>
+    </div>
 
-    <EditForm Model="@updateModel" OnValidSubmit="HandleValidSubmit" FormName="OrderForm">
-        <DataAnnotationsValidator />
-        <ValidationSummary Model="@updateModel" />
-        <div class="form-group mb-3">
-            <label class="control-label">Order Name</label>
-            <InputText @bind-value="updateModel.OrderName" class="form-control" />
-            <ValidationMessage For="@(() => updateModel.OrderName)" class="text-danger" />
+    <div class="card">
+        <div class="card-header">
+            <strong>Update Order</strong>
         </div>
-        <div class="form-group">
-            <button type="submit" class="btn btn-primary">Update Order</button>
+        <div class="card-body">
+            <EditForm Model="@updateModel" OnValidSubmit="HandleValidSubmit">
+                <DataAnnotationsValidator/>
+                <ValidationSummary/>
+
+                <div class="mb-3">
+                    <label class="form-label">Order Name</label>
+                    <InputText @bind-Value="updateModel.OrderName" class="form-control" />
+                    <ValidationMessage For="@(() => updateModel.OrderName)" class="text-danger" />
+                </div>
+
+                <div class="text-end">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> Update Order
+                    </button>
+                </div>
+            </EditForm>
         </div>
-    </EditForm>
+    </div>
 }
 
 @code {
-    [Parameter]
-    public int Id { get; set; }
-    private OrderResultsModel orderInfo = new OrderResultsModel()
-    {
-            Order = default!, //default! is a temporary workaround for required properties I may set later.
+    [Parameter] public int Id { get; set; }
+
+    private OrderResultsModel orderInfo = new()
+        {
+            Order = default!,
             ItemPurchased = string.Empty
-    };
+        };
+
     private string? errorString;
-    private OrderUpdateModel updateModel = new OrderUpdateModel();
+    private OrderUpdateModel updateModel = new();
     private bool confirmDelete = false;
 
     protected override async Task OnInitializedAsync()
     {
-        HttpResponseMessage response = await Http.GetAsync($"api/order/{Id}");
-
-        if(response.IsSuccessStatusCode)
+        try
         {
-            var result = await response.Content.ReadFromJsonAsync<OrderResultsModel>();
-            if (result is not null)
+            HttpResponseMessage response = await Http.GetAsync($"api/order/{Id}");
+
+            if (response.IsSuccessStatusCode)
             {
-                orderInfo = result;
-                updateModel.Id = orderInfo.Order.Id;
-                updateModel.OrderName = orderInfo.Order.OrderName;
+                var result = await response.Content.ReadFromJsonAsync<OrderResultsModel>();
+                if (result is not null)
+                {
+                    orderInfo = result;
+                    updateModel.Id = result.Order.Id;
+                    updateModel.OrderName = result.Order.OrderName;
+                }
+                else
+                {
+                    errorString = "Failed to deserialize order information.";
+                }
             }
             else
             {
-                errorString = "Failed to deserialize order information.";
+                errorString = response.ReasonPhrase;
             }
         }
-        else
+        catch (Exception ex)
         {
-            errorString = response.ReasonPhrase;
+            errorString = $"An error occurred: {ex.Message}";
         }
     }
+
     private async Task HandleValidSubmit()
     {
         try
         {
             HttpResponseMessage response = await Http.PutAsJsonAsync("api/order", updateModel);
-            orderInfo.Order.OrderName = updateModel.OrderName;
+            if (response.IsSuccessStatusCode)
+            {
+                orderInfo.Order.OrderName = updateModel.OrderName;
+            }
+            else
+            {
+                errorString = $"Update failed: {response.ReasonPhrase}";
+            }
         }
         catch (Exception ex)
         {
-            errorString = ex.Message;
+            errorString = $"An error occurred during update: {ex.Message}";
         }
     }
+
     private async Task HandleDeleteRecord()
     {
-        HttpResponseMessage response = await Http.DeleteAsync($"api/order/{Id}");
-        if (response.IsSuccessStatusCode)
+        try
         {
-            navigationManager.NavigateTo("food/List");
+            HttpResponseMessage response = await Http.DeleteAsync($"api/order/{Id}");
+            if (response.IsSuccessStatusCode)
+            {
+                navigationManager.NavigateTo("food/List");
+            }
+            else
+            {
+                errorString = $"Delete failed: {response.ReasonPhrase}";
+            }
         }
-        else
+        catch (Exception ex)
         {
-            errorString = response.ReasonPhrase;
+            errorString = $"An error occurred during delete: {ex.Message}";
         }
     }
-    }
+}
